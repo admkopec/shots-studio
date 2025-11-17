@@ -55,6 +55,10 @@ dev_dependencies:
   sentry_dart_plugin: ^2.4.1
   flutter_test:
     sdk: flutter
+  integration_test:
+    sdk: flutter
+  mockito: ^5.4.4
+  build_runner: ^2.4.8
   flutter_lints: ^5.0.0
   flutter_launcher_icons: ^0.14.3
 
