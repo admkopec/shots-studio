@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:image_picker/image_picker.dart';
+import 'package:photo_manager/photo_manager.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:uuid/uuid.dart';
@@ -42,6 +43,8 @@ typedef LoadingProgressCallback = void Function(int current, int total);
 class ImageLoaderService {
   final ImagePicker _picker = ImagePicker();
   final Uuid _uuid = const Uuid();
+
+  DateTime _iosLastSync = DateTime.fromMillisecondsSinceEpoch(0);
 
   /// Load images from camera or gallery using image picker
   Future<ImageLoadResult> loadFromImagePicker({
@@ -284,6 +287,60 @@ class ImageLoaderService {
     return paths;
   }
 
+  Future<ImageLoadResult> loadIosScreenshots({
+    required bool isLimitEnabled,
+    required int screenshotLimit,
+    DateTime? since
+  }) async {
+    if (kIsWeb || !Platform.isIOS) {
+      return ImageLoadResult.success([]);
+    }
+
+    try {
+      final photoPermissions = await PhotoManager.requestPermissionExtend();
+      if (!photoPermissions.hasAccess) {
+        return ImageLoadResult.error('Photos permission denied or limited with no assets granted.');
+      }
+
+      final assets = await _fetchIOSScreenshotAssets(since: since, limit: isLimitEnabled ? screenshotLimit : null);
+      final List<Screenshot> shots = [];
+
+      for (final asset in assets) {
+        try {
+          final file = await asset.file;
+          if (file != null && await file.exists()) {
+            final screenshot = await Screenshot.fromFilePath(
+              id: _uuid.v4(),
+              filePath: file.path,
+              knownFileSize: await file.length(),
+            );
+            shots.add(screenshot);
+          } else {
+            // fallback to bytes (iCloud photos)
+            final bytes = await asset.originBytes;
+            if (bytes != null) {
+              final screenshot = Screenshot.fromBytes(
+                id: _uuid.v4(),
+                bytes: Uint8List.fromList(bytes),
+                fileName: asset.title ?? 'screenshot_${asset.id}.png',
+                filePath: null,
+              );
+              shots.add(screenshot);
+            }
+          }
+        } catch (e) {
+          print('Skipping iOS asset ${asset.id}: $e');
+        }
+      }
+
+      _iosLastSync = DateTime.now();
+      return ImageLoadResult.success(shots);
+    } catch (e) {
+      print('Error loading iOS screenshots: $e');
+      return ImageLoadResult.error('Error loading iOS screenshots: $e');
+    }
+  }
+
   /// Create a Screenshot object from image bytes (useful for web uploads)
   Screenshot createScreenshotFromBytes({
     required Uint8List bytes,
@@ -315,5 +372,47 @@ class ImageLoaderService {
     } else {
       return '${(fileSizeBytes / (1024 * 1024)).toStringAsFixed(1)} MB';
     }
+  }
+
+  /// Low-level function to fetch iOS screenshot assets
+  Future<List<AssetEntity>> _fetchIOSScreenshotAssets({
+    DateTime? since,
+    int? limit,
+  }) async {
+    // mediaType = image (1) AND mediaSubtypes has bit (1<<2) == PhotoScreenshot
+    final where = StringBuffer()
+      ..write("${CustomColumns.base.mediaType} = 1")
+      ..write(" AND ${CustomColumns.darwin.mediaSubtypes} & (1 << 2) = (1 << 2)"); // screenshots
+    if (since != null) {
+      final seconds = since.millisecondsSinceEpoch ~/ 1000;
+      where.write(" AND ${CustomColumns.base.createDate} > $seconds");
+    }
+
+    final pathFilter = PMPathFilter(
+      darwin: PMDarwinPathFilter(
+        type: [PMDarwinAssetCollectionType.smartAlbum],
+        subType: [PMDarwinAssetCollectionSubtype.smartAlbumScreenshots],
+      ),
+    );
+
+    final paths = await PhotoManager.getAssetPathList(
+        type: RequestType.image,
+        onlyAll: false,
+        hasAll: false,
+        pathFilterOption: pathFilter
+    );
+
+    if (paths.isEmpty) return [];
+
+    final screenshotsAlbum = paths.first;
+    // TODO: Set default page limit
+    final pageSize = (limit != null && limit > 0) ? limit : 2000;
+
+    final allAssets = await screenshotsAlbum.getAssetListPaged(page: 0, size: pageSize);
+    final filtered = since == null
+        ? allAssets
+        : allAssets.where((a) => a.createDateTime.isAfter(since)).toList();
+
+    return filtered;
   }
 }
