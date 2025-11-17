@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -42,11 +44,15 @@ import 'package:shots_studio/widgets/custom_paths_dialog.dart';
 import 'package:shots_studio/utils/build_source.dart';
 import 'package:shots_studio/utils/display_utils.dart';
 
+const bool kIsIntegrationTest =
+bool.fromEnvironment('IS_INTEGRATION_TEST', defaultValue: false);
+
 void main() async {
   await SentryFlutter.init(
     (options) {
       options.dsn =
-          'https://6f96d22977b283fc325e038ac45e6e5e@o4509484018958336.ingest.us.sentry.io/4509484020072448';
+      'https://11a2e166f94b29ca8d59d2f1f1ab7114@o4510211017211904.ingest.de.sentry.io/4510211018391632';
+          // ORIGINAL VALUE: 'https://6f96d22977b283fc325e038ac45e6e5e@o4509484018958336.ingest.us.sentry.io/4509484020072448';
 
       options.tracesSampleRate =
           kDebugMode ? 0 : 0.1; // 30% in debug, 10% in production
@@ -298,37 +304,39 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _loadDataFromPrefs();
     _loadSettings();
 
-    // Initialize server message checking in background
-    if (!kIsWeb) {
-      _initializeServerMessageChecking();
-    }
-
-    if (!kIsWeb) {
-      _loadAndroidScreenshotsIfNeeded().then((_) {
-        // Setup FileWatcher only AFTER initial loading is complete
-        // This ensures no duplicates from initial scan
-        _setupFileWatcher();
-      });
-      _setupBackgroundServiceListeners();
-    }
-    // Show privacy dialog after the first frame
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      // Show privacy dialog and only proceed to API key guide if accepted
-      bool privacyAccepted = await showPrivacyScreenIfNeeded(context);
-      if (privacyAccepted && context.mounted) {
-        // Log install info when onboarding is completed
-        AnalyticsService().logInstallInfo();
-        // Log install source analytics
-        AnalyticsService().logInstallSource(BuildSource.current.value);
-
-        // API key guide will only show after privacy is accepted
-        await showApiKeyGuideIfNeeded(context, _apiKey, _updateApiKey);
-
-        _checkForUpdates();
-        _checkForServerMessages();
-        _autoProcessWithGemini();
+    if (!kIsIntegrationTest) {
+      // Initialize server message checking in background
+      if (!kIsWeb) {
+        _initializeServerMessageChecking();
       }
-    });
+
+      if (!kIsWeb) {
+        _loadAndroidScreenshotsIfNeeded().then((_) {
+          // Setup FileWatcher only AFTER initial loading is complete
+          // This ensures no duplicates from initial scan
+          _setupFileWatcher();
+        });
+        _setupBackgroundServiceListeners();
+      }
+      // Show privacy dialog after the first frame
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        // Show privacy dialog and only proceed to API key guide if accepted
+        bool privacyAccepted = await showPrivacyScreenIfNeeded(context);
+        if (privacyAccepted && context.mounted) {
+          // Log install info when onboarding is completed
+          AnalyticsService().logInstallInfo();
+          // Log install source analytics
+          AnalyticsService().logInstallSource(BuildSource.current.value);
+
+          // API key guide will only show after privacy is accepted
+          await showApiKeyGuideIfNeeded(context, _apiKey, _updateApiKey);
+
+          _checkForUpdates();
+          _checkForServerMessages();
+          _autoProcessWithGemini();
+        }
+      });
+    }
   }
 
   @override
@@ -1115,18 +1123,35 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       // Get custom paths from preferences
       final customPaths = await CustomPathService.getCustomPaths();
 
-      final result = await _imageLoaderService.loadAndroidScreenshots(
-        existingScreenshots: _screenshots,
-        isLimitEnabled: false, // Always disabled
-        screenshotLimit: _screenshotLimit,
-        customPaths: customPaths,
-        onProgress: (current, total) {
-          setState(() {
-            _loadingProgress = current;
-            _totalToLoad = total;
-          });
-        },
-      );
+      final ImageLoadResult result;
+      if (Platform.isIOS) {
+        final DateTime? since = _screenshots.isEmpty
+            ? null
+            : _screenshots
+            .map((s) => s.addedOn)
+            .reduce((a, b) => a.isAfter(b) ? a : b);
+
+        result = await _imageLoaderService.loadIosScreenshots(
+          since: since,
+          isLimitEnabled: false,
+          // Always disabled
+          screenshotLimit: _screenshotLimit,
+        );
+      } else {
+        result = await _imageLoaderService.loadAndroidScreenshots(
+          existingScreenshots: _screenshots,
+          isLimitEnabled: false,
+          // Always disabled
+          screenshotLimit: _screenshotLimit,
+          customPaths: customPaths,
+          onProgress: (current, total) {
+            setState(() {
+              _loadingProgress = current;
+              _totalToLoad = total;
+            });
+          },
+        );
+      }
 
       if (result.success) {
         setState(() {

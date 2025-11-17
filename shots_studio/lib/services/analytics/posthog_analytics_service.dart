@@ -8,8 +8,15 @@ class PostHogAnalyticsService {
   static final PostHogAnalyticsService _instance =
       PostHogAnalyticsService._internal();
   factory PostHogAnalyticsService() => _instance;
-  PostHogAnalyticsService._internal();
 
+  // Normal constructor (used in app)
+  PostHogAnalyticsService._internal() : _posthog = Posthog();
+
+  // Test-only constructor (so you can pass a mock)
+  @visibleForTesting
+  PostHogAnalyticsService.test(Posthog posthog) : _posthog = posthog;
+
+  final Posthog _posthog;
   bool _initialized = false;
   bool _analyticsEnabled =
       false; // Default to false for privacy - analytics is opt-in only
@@ -30,7 +37,7 @@ class PostHogAnalyticsService {
       // No explicit opt-in needed as it's controlled via platform configs
     } else {
       // Disable PostHog by resetting the instance
-      await Posthog().reset();
+      await _posthog.reset();
     }
 
     _initialized = true;
@@ -80,7 +87,7 @@ class PostHogAnalyticsService {
 
     if (_initialized) {
       // Reset PostHog to clear all data
-      await Posthog().reset();
+      await _posthog.reset();
     }
   }
 
@@ -96,7 +103,7 @@ class PostHogAnalyticsService {
   ) async {
     if (!_shouldLog()) return;
     return;
-    await Posthog().capture(
+    await _posthog.capture(
       eventName: 'batch_processing_time',
       properties: {
         'processing_time_ms': processingTimeMs,
@@ -109,7 +116,7 @@ class PostHogAnalyticsService {
   Future<void> logAIProcessingSuccess(int screenshotCount) async {
     if (!_shouldLog()) return;
     return;
-    await Posthog().capture(
+    await _posthog.capture(
       eventName: 'ai_processing_success',
       properties: {'screenshot_count': screenshotCount},
     );
@@ -118,13 +125,13 @@ class PostHogAnalyticsService {
   Future<void> logAIProcessingFailure(String error, int screenshotCount) async {
     if (!_shouldLog()) return;
 
-    await Posthog().capture(
+    await _posthog.capture(
       eventName: 'ai_processing_failure',
       properties: {'error': error, 'screenshot_count': screenshotCount},
     );
 
     // Also capture error details for debugging
-    await Posthog().capture(
+    await _posthog.capture(
       eventName: 'ai_processing_exception',
       properties: {'error_details': error, 'screenshot_count': screenshotCount},
     );
@@ -142,7 +149,7 @@ class PostHogAnalyticsService {
   }) async {
     if (!_shouldLog()) return;
 
-    await Posthog().capture(
+    await _posthog.capture(
       eventName: 'gemma_processing_time',
       properties: {
         'processing_time_ms': processingTimeMs,
@@ -164,13 +171,13 @@ class PostHogAnalyticsService {
   Future<void> logCollectionCreated() async {
     if (!_shouldLog()) return;
 
-    await Posthog().capture(eventName: 'collection_created');
+    await _posthog.capture(eventName: 'collection_created');
   }
 
   Future<void> logCollectionDeleted() async {
     if (!_shouldLog()) return;
 
-    await Posthog().capture(eventName: 'collection_deleted');
+    await _posthog.capture(eventName: 'collection_deleted');
   }
 
   Future<void> logCollectionStats(
@@ -181,7 +188,7 @@ class PostHogAnalyticsService {
   ) async {
     if (!_shouldLog()) return;
 
-    await Posthog().capture(
+    await _posthog.capture(
       eventName: 'collection_screenshot_stats',
       properties: {
         'total_collections': totalCollections,
@@ -196,13 +203,13 @@ class PostHogAnalyticsService {
   Future<void> logScreenView(String screenName) async {
     if (!_shouldLog()) return;
 
-    await Posthog().screen(screenName: screenName);
+    await _posthog.screen(screenName: screenName);
   }
 
   Future<void> logFeatureUsed(String featureName) async {
     if (!_shouldLog()) return;
 
-    await Posthog().capture(
+    await _posthog.capture(
       eventName: 'feature_used',
       properties: {'feature_name': featureName},
     );
@@ -212,7 +219,7 @@ class PostHogAnalyticsService {
     if (!_shouldLog()) return;
 
     return;
-    await Posthog().capture(
+    await _posthog.capture(
       eventName: 'user_path',
       properties: {'from_screen': fromScreen, 'to_screen': toScreen},
     );
@@ -222,7 +229,7 @@ class PostHogAnalyticsService {
   Future<void> logAppStartup() async {
     if (!_shouldLog()) return;
 
-    await Posthog().capture(
+    await _posthog.capture(
       eventName: 'app_startup',
       properties: {'timestamp': DateTime.now().millisecondsSinceEpoch},
     );
@@ -231,7 +238,7 @@ class PostHogAnalyticsService {
   Future<void> logImageLoadTime(int loadTimeMs, String imageSource) async {
     if (!_shouldLog()) return;
 
-    await Posthog().capture(
+    await _posthog.capture(
       eventName: 'image_load_time',
       properties: {
         'load_time_ms': loadTimeMs,
@@ -244,13 +251,13 @@ class PostHogAnalyticsService {
   Future<void> logNetworkError(String error, String context) async {
     if (!_shouldLog()) return;
 
-    await Posthog().capture(
+    await _posthog.capture(
       eventName: 'network_error',
       properties: {'error': error, 'context': context},
     );
 
     // Also capture error details for debugging
-    await Posthog().capture(
+    await _posthog.capture(
       eventName: 'network_error_exception',
       properties: {'error_details': '$context: $error'},
     );
@@ -260,7 +267,7 @@ class PostHogAnalyticsService {
   Future<void> logActiveDay() async {
     if (!_shouldLog()) return;
 
-    await Posthog().capture(
+    await _posthog.capture(
       eventName: 'active_day',
       properties: {'date': DateTime.now().toIso8601String().split('T')[0]},
     );
@@ -269,7 +276,7 @@ class PostHogAnalyticsService {
   Future<void> logFeatureAdopted(String featureName) async {
     if (!_shouldLog()) return;
 
-    await Posthog().capture(
+    await _posthog.capture(
       eventName: 'feature_adopted',
       properties: {'feature_name': featureName},
     );
@@ -278,7 +285,7 @@ class PostHogAnalyticsService {
   Future<void> logReturnUser(int daysSinceLastOpen) async {
     if (!_shouldLog()) return;
 
-    await Posthog().capture(
+    await _posthog.capture(
       eventName: 'return_user',
       properties: {'days_since_last_open': daysSinceLastOpen},
     );
@@ -287,7 +294,7 @@ class PostHogAnalyticsService {
   Future<void> logUsageTime(String timeOfDay) async {
     if (!_shouldLog()) return;
 
-    await Posthog().capture(
+    await _posthog.capture(
       eventName: 'usage_time',
       properties: {'time_of_day': timeOfDay},
     );
@@ -297,7 +304,7 @@ class PostHogAnalyticsService {
   Future<void> logSearchQuery(String query, int resultsCount) async {
     if (!_shouldLog()) return;
 
-    await Posthog().capture(
+    await _posthog.capture(
       eventName: 'search_query',
       properties: {
         'query_length': query.length,
@@ -310,7 +317,7 @@ class PostHogAnalyticsService {
   Future<void> logSearchTimeToResult(int timeMs, bool successful) async {
     if (!_shouldLog()) return;
 
-    await Posthog().capture(
+    await _posthog.capture(
       eventName: 'search_time_to_result',
       properties: {'time_ms': timeMs, 'successful': successful},
     );
@@ -319,7 +326,7 @@ class PostHogAnalyticsService {
   Future<void> logSearchSuccess(String query, int timeMs) async {
     if (!_shouldLog()) return;
 
-    await Posthog().capture(
+    await _posthog.capture(
       eventName: 'search_success',
       properties: {'query_length': query.length, 'time_to_success_ms': timeMs},
     );
@@ -329,7 +336,7 @@ class PostHogAnalyticsService {
   Future<void> logStorageUsage(int totalSizeBytes, int screenshotCount) async {
     if (!_shouldLog()) return;
 
-    await Posthog().capture(
+    await _posthog.capture(
       eventName: 'storage_usage',
       properties: {
         'total_size_bytes': totalSizeBytes,
@@ -345,7 +352,7 @@ class PostHogAnalyticsService {
   ) async {
     if (!_shouldLog()) return;
     return;
-    await Posthog().capture(
+    await _posthog.capture(
       eventName: 'background_resource_usage',
       properties: {
         'processing_time_ms': processingTimeMs,
@@ -358,7 +365,7 @@ class PostHogAnalyticsService {
   Future<void> logBatteryImpact(String level) async {
     if (!_shouldLog()) return;
     return;
-    await Posthog().capture(
+    await _posthog.capture(
       eventName: 'battery_impact',
       properties: {
         'impact_level': level, // 'low', 'medium', 'high'
@@ -369,7 +376,7 @@ class PostHogAnalyticsService {
   Future<void> logNetworkUsage(int bytesUsed, String operation) async {
     if (!_shouldLog()) return;
     return;
-    await Posthog().capture(
+    await _posthog.capture(
       eventName: 'network_usage',
       properties: {
         'bytes_used': bytesUsed,
@@ -385,7 +392,7 @@ class PostHogAnalyticsService {
   ) async {
     if (!_shouldLog()) return;
     return;
-    await Posthog().capture(
+    await _posthog.capture(
       eventName: 'background_task_completed',
       properties: {
         'task_name': taskName,
@@ -399,7 +406,7 @@ class PostHogAnalyticsService {
   Future<void> logTotalScreenshotsProcessed(int count) async {
     if (!_shouldLog()) return;
 
-    await Posthog().capture(
+    await _posthog.capture(
       eventName: 'total_screenshots_processed',
       properties: {'count': count},
     );
@@ -408,7 +415,7 @@ class PostHogAnalyticsService {
   Future<void> logTotalCollections(int count) async {
     if (!_shouldLog()) return;
 
-    await Posthog().capture(
+    await _posthog.capture(
       eventName: 'total_collections',
       properties: {'count': count},
     );
@@ -420,7 +427,7 @@ class PostHogAnalyticsService {
   ) async {
     if (!_shouldLog()) return;
 
-    await Posthog().capture(
+    await _posthog.capture(
       eventName: 'screenshots_in_collection',
       properties: {'collection_screenshot_count': screenshotCount},
     );
@@ -429,7 +436,7 @@ class PostHogAnalyticsService {
   Future<void> logScreenshotsAutoCategorized(int count) async {
     if (!_shouldLog()) return;
 
-    await Posthog().capture(
+    await _posthog.capture(
       eventName: 'screenshots_auto_categorized',
       properties: {'count': count},
     );
@@ -438,7 +445,7 @@ class PostHogAnalyticsService {
   Future<void> logReminderSet() async {
     if (!_shouldLog()) return;
 
-    await Posthog().capture(eventName: 'reminder_set');
+    await _posthog.capture(eventName: 'reminder_set');
   }
 
   Future<void> logInstallInfo() async {
@@ -466,7 +473,7 @@ class PostHogAnalyticsService {
         platform = 'web';
       }
 
-      await Posthog().capture(
+      await _posthog.capture(
         eventName: 'install_info',
         properties: {
           'install_date': DateTime.now().toIso8601String(),
@@ -478,7 +485,7 @@ class PostHogAnalyticsService {
       );
 
       // Set person properties for better analytics
-      await Posthog().identify(
+      await _posthog.identify(
         userId: 'anonymous_${DateTime.now().millisecondsSinceEpoch}',
         userProperties: {
           'app_version': packageInfo.version,
@@ -494,7 +501,7 @@ class PostHogAnalyticsService {
   Future<void> logInstallSource(String source) async {
     if (!_shouldLog()) return;
 
-    await Posthog().capture(
+    await _posthog.capture(
       eventName: 'install_$source',
       properties: {
         'source': source,
@@ -529,7 +536,7 @@ class PostHogAnalyticsService {
 
     final Map<String, Object>? objectProperties =
         properties?.cast<String, Object>();
-    await Posthog().identify(userId: userId, userProperties: objectProperties);
+    await _posthog.identify(userId: userId, userProperties: objectProperties);
   }
 
   // Set person properties by identifying the current user with new properties
@@ -540,28 +547,28 @@ class PostHogAnalyticsService {
         properties.cast<String, Object>();
     // Get current user ID or create anonymous one
     final userId = 'user_${DateTime.now().millisecondsSinceEpoch}';
-    await Posthog().identify(userId: userId, userProperties: objectProperties);
+    await _posthog.identify(userId: userId, userProperties: objectProperties);
   }
 
   // Reset user (for logout)
   Future<void> reset() async {
     if (!_shouldLog()) return;
 
-    await Posthog().reset();
+    await _posthog.reset();
   }
 
   // Feature flags (if you want to use PostHog's feature flag functionality)
   Future<bool> isFeatureEnabled(String featureKey) async {
     if (!_shouldLog()) return false;
 
-    return await Posthog().isFeatureEnabled(featureKey);
+    return await _posthog.isFeatureEnabled(featureKey);
   }
 
   // Alias user (link anonymous user to identified user)
   Future<void> alias(String alias) async {
     if (!_shouldLog()) return;
 
-    await Posthog().alias(alias: alias);
+    await _posthog.alias(alias: alias);
   }
 
   // Group analytics (for organization-level analytics)
@@ -574,7 +581,7 @@ class PostHogAnalyticsService {
 
     final Map<String, Object>? objectProperties =
         properties?.cast<String, Object>();
-    await Posthog().group(
+    await _posthog.group(
       groupType: groupType,
       groupKey: groupKey,
       groupProperties: objectProperties,
