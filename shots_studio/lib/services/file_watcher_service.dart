@@ -344,10 +344,6 @@ class FileWatcherService {
 
           paths.addAll(androidPaths);
         }
-      } else if (Platform.isIOS) {
-        final documentsDir = await getApplicationDocumentsDirectory();
-        final iosPath = '${documentsDir.path}/Screenshots';
-        paths.add(iosPath);
       }
 
       // Add custom paths
