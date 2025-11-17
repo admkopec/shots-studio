@@ -55,8 +55,11 @@
             android:value="2" />
             
         <!-- PostHog Configuration -->
-        <meta-data android:name="com.posthog.posthog.API_KEY" android:value="phc_10fnP6axCcilWjYny4YISbDbsKjtpQ0PI0yhXroQtXd" />
-        <meta-data android:name="com.posthog.posthog.POSTHOG_HOST" android:value="https://us.i.posthog.com" />
+        <meta-data android:name="com.posthog.posthog.API_KEY" android:value="phc_2fp1Occ2vU9dzlDJaTbguGguUoY6ERrYaWaVrIWr4O7" />
+        <meta-data android:name="com.posthog.posthog.POSTHOG_HOST" android:value="https://eu.i.posthog.com" />
+        <!-- ORIGINAL VALUES: -->
+<!--        <meta-data android:name="com.posthog.posthog.API_KEY" android:value="phc_10fnP6axCcilWjYny4YISbDbsKjtpQ0PI0yhXroQtXd" />-->
+<!--        <meta-data android:name="com.posthog.posthog.POSTHOG_HOST" android:value="https://us.i.posthog.com" />-->
         <meta-data android:name="com.posthog.posthog.TRACK_APPLICATION_LIFECYCLE_EVENTS" android:value="true" />
         <meta-data android:name="com.posthog.posthog.DEBUG" android:value="true" />
             
